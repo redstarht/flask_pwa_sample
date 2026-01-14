@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <title>入出管理PWA</title>
@@ -7,19 +8,35 @@
     <meta name="theme-color" content="#2196f3">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; margin: 2em; }
-        form { margin-bottom: 2em; }
-        input, button { font-size: 1em; padding: 0.5em; }
-        ul { padding-left: 1em; }
+        body {
+            font-family: sans-serif;
+            margin: 2em;
+        }
+
+        form {
+            margin-bottom: 2em;
+        }
+
+        input,
+        button {
+            font-size: 1em;
+            padding: 0.5em;
+        }
+
+        ul {
+            padding-left: 1em;
+        }
     </style>
 </head>
+
 <body>
     <h1>入出管理PWAアプリ</h1>
-    <form method="post" autocomplete="off">
-        <input type="text" name="name" placeholder="名前" required>
-        <button type="submit" name="action" value="入室">入室</button>
-        <button type="submit" name="action" value="退室">退室</button>
+    <form id="inputForm">
+        <input type="text" id="dataInput" required>
+        <button type="button" id="enterBtn">入室</button>
+        <button type="button" id="exitBtn">退室</button>
     </form>
+    <div id="status"></div>
     <h2>記録一覧</h2>
     <ul>
         {% for log in logs %}
@@ -30,9 +47,11 @@
         // Service Worker登録
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}")
-                .then(function(reg) { console.log('Service Worker登録成功:', reg); })
-                .catch(function(err) { console.log('Service Worker登録失敗:', err); });
+                .then(function (reg) { console.log('Service Worker登録成功:', reg); })
+                .catch(function (err) { console.log('Service Worker登録失敗:', err); });
         }
     </script>
+    <script type="module" src="../static/app.js"></script>
 </body>
+
 </html>

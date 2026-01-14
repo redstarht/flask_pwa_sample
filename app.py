@@ -1,6 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from socket import gethostname
+
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///entry_exit.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -29,4 +32,4 @@ def index():
     logs = EntryExit.query.order_by(EntryExit.timestamp.desc()).all()
     return render_template('index.html', logs=logs)
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,host="0.0.0.0")

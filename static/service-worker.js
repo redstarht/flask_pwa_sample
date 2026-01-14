@@ -5,19 +5,23 @@ const urlsToCache = [
   '/static/icon-192.png',
   '/static/icon-512.png'
 ];
+
 // インストール時にキャッシュ
-self.addEventListener('install', function(event) {
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
+    caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(urlsToCache);
     })
   );
 });
-// リクエスト時にキャッシュから返す
-self.addEventListener('fetch', function(event) {
+
+// オフライン時は "/" を返す
+self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(function(response) {
-      return response || fetch(event.request);
+    fetch(event.request).catch(() => {
+      return caches.match(event.request).then(response => {
+        return response || caches.match('/');
+      });
     })
   );
 });
