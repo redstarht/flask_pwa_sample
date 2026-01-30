@@ -80,5 +80,41 @@ document.getElementById('inputForm').addEventListener('submit', function(e) {
     document.getElementById('status').innerText = 'オフライン→ローカル保存';
   }
 });
+
+
+document.getElementById('enterBtn').addEventListener('click', () => {
+  console.log("発火")
+    handleSubmit("入室");
+});
+
+document.getElementById('exitBtn').addEventListener('click', () => {
+    handleSubmit("退室");
+});
+
+function handleSubmit(action) {
+    const input = document.getElementById('dataInput').value;
+
+    if (navigator.onLine) {
+        sendDataToServer({name: input, action: action})
+            .then(() => {
+                document.getElementById('status').innerText = '送信成功（オンライン）';
+            })
+            .catch(() => {
+                saveDataLocally({name: input, action: action});
+                document.getElementById('status').innerText = '送信失敗→ローカル保存';
+            });
+    } else {
+        saveDataLocally({name: input, action: action});
+        document.getElementById('status').innerText = 'オフライン→ローカル保存';
+    }
+}
+
+
+// ネットワーク切断時のデータ送信
+function disconnectSendLocalData(){
+  alert("ネットワークが切断されたのでデータを今から送ります")
+  trySendLocalData()
+}
+
 // ネット復旧時に未送信データ送信
 window.addEventListener('online', trySendLocalData);
