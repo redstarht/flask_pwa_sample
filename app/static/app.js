@@ -12,10 +12,14 @@ function openDB() {
     request.onerror = () => reject(request.error);
   });
 }
-function saveDataLocally(data) {
+
+// IndexedDBにデータを保存し、保存されたデータのキーを返す
+function saveDataLocally(data) { 
   return openDB().then(db => {
     const tx = db.transaction(storeName, "readwrite");
-    tx.objectStore(storeName).add({ data, sent: false });
+    const store = tx.objectStore(storeName);
+    const request = store.add({ data, sent: false });
+    request.onsuccess = (event) => console.log("Data saved with key:", event.target.result); // デバッグ用
     return tx.complete;
   });
 }
@@ -24,8 +28,18 @@ function getUnsyncedData() {
     return new Promise((resolve) => {
       const tx = db.transaction(storeName, "readonly");
       const store = tx.objectStore(storeName);
-      const req = store.getAll();
-      req.onsuccess = () => resolve(req.result.filter(item => !item.sent));
+      const itemsWithKeys = [];
+      store.openCursor().onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          if (!cursor.value.sent) {
+            itemsWithKeys.push({ id: cursor.key, data: cursor.value.data });
+          }
+          cursor.continue();
+        } else {
+          resolve(itemsWithKeys);
+        }
+      };
     });
   });
 }
@@ -37,7 +51,7 @@ function markDataAsSent(id) {
     req.onsuccess = () => {
       const item = req.result;
       if (item) {
-        item.sent = true;
+        item.sent = true; // sent フラグを true に設定
         store.put(item, id);
       }
     };
@@ -55,31 +69,13 @@ function sendDataToServer(data) {
 // 送信処理
 function trySendLocalData() {
   getUnsyncedData().then(items => {
-    items.forEach((item, idx) => {
-      sendDataToServer(item.data)
-        .then(() => markDataAsSent(idx))
+    items.forEach(item => { // item は { id: key, data: {name, action} } の形式
+      sendDataToServer(item.data) // item.data は {name, action}
+        .then(() => markDataAsSent(item.id)) // IndexedDB のキーを渡す
         .catch(() => {}); // 失敗時はそのまま
     });
   });
 }
-// 入力フォーム処理
-document.getElementById('inputForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  const input = document.getElementById('dataInput').value;
-  if (navigator.onLine) {
-    sendDataToServer({data: input})
-      .then(() => {
-        document.getElementById('status').innerText = '送信成功（オンライン）';
-      })
-      .catch(() => {
-        saveDataLocally(input);
-        document.getElementById('status').innerText = '送信失敗→ローカル保存';
-      });
-  } else {
-    saveDataLocally(input);
-    document.getElementById('status').innerText = 'オフライン→ローカル保存';
-  }
-});
 
 
 document.getElementById('enterBtn').addEventListener('click', () => {
@@ -109,12 +105,6 @@ function handleSubmit(action) {
     }
 }
 
-
-// ネットワーク切断時のデータ送信
-function disconnectSendLocalData(){
-  alert("ネットワークが切断されたのでデータを今から送ります")
-  trySendLocalData()
-}
 
 // ネット復旧時に未送信データ送信
 window.addEventListener('online', trySendLocalData);

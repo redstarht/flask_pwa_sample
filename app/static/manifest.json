@@ -1,10 +1,10 @@
 {
-  "name": "入出管理PWA",
-  "short_name": "入出管理",
+  "name": "Flask PWA Sample",
+  "short_name": "FlaskPWA",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2196f3",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "/static/icon-192.png",
