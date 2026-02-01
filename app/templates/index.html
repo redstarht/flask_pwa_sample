@@ -11,34 +11,36 @@
     <script>
         // Service Worker登録
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
+            window.addEventListener('load', function () {
                 navigator.serviceWorker.register('/sw.js') // service-worker.js から sw.js に変更
                     .then(function (reg) { console.log('Service Worker登録成功:', reg); })
                     .catch(function (err) { console.log('Service Worker登録失敗:', err); });
             });
         }
+
     </script>
+    <script type="module" src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 
 <body>
     <div class="container">
         <h1>Flask PWA サンプルアプリ</h1>
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="flashes">
-                    {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
+        {% if messages %}
+        <ul class="flashes">
+            {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
         {% endwith %}
         {% if current_user.is_authenticated %}
-            <p>こんにちは、{{ current_user.username }}さん！</p>
-            <p><a href="{{ url_for('main.dashboard') }}">ダッシュボードへ</a></p>
-            <p><a href="{{ url_for('main.logout') }}">ログアウト</a></p>
+        <p>こんにちは、{{ current_user.username }}さん！</p>
+        <p><a href="{{ url_for('main.dashboard') }}">ダッシュボードへ</a></p>
+        <p><a href="{{ url_for('main.logout') }}">ログアウト</a></p>
         {% else %}
-            <p><a href="{{ url_for('main.login') }}">ログイン</a></p>
-            <p><a href="{{ url_for('main.register') }}">新規登録</a></p>
+        <p><a href="{{ url_for('main.login') }}">ログイン</a></p>
+        <p><a href="{{ url_for('main.register') }}">新規登録</a></p>
         {% endif %}
         <hr>
         <div id="inputForm">
@@ -46,18 +48,32 @@
             <button id="enterBtn">入室</button><button id="exitBtn">退室</button>
             <p id="status"></p>
         </div>
+        <div class="imageForm">
+            <input type="file" id="imageInput" accept="image/*">
+            <button id="uploadBtn">アップロード</button>
+        </div>
+        <h2>登録画像
+            <div id="imageDisplayArea">
+                <h3>最新の画像</h3>
+                {% if img_base64 %}
+                <img id="dbImage" src="data:image/jpeg;base64,{{ img_base64 }}" alt="DB画像" style="max-width: 300px;">
+                {% else %}
+                <p>画像が登録されていません。</p>
+                {% endif %}
+            </div>
+        </h2>
         <h2>記録一覧</h2>
         <ul>
             {# ログデータを表示する場合は、main.py の index ルートで logs を渡す必要があります #}
             {% if logs %}
-                {% for log in logs %}
-                <li>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }} - {{ log.name }} - {{ log.action }}</li>
-                {% endfor %}
+            {% for log in logs %}
+            <li>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }} - {{ log.name }} - {{ log.action }}</li>
+            {% endfor %}
             {% else %}
-                <li>記録がありません。</li>
+            <li>記録がありません。</li>
             {% endif %}
         </ul>
-        <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+
     </div>
 </body>
 

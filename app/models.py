@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String,DateTime
+from sqlalchemy import Column, Integer, String,DateTime,LargeBinary
 import datetime
 from flask_login import UserMixin
 
@@ -24,3 +24,10 @@ class EntryExit(Base):
     timestamp = Column(DateTime, default=datetime.datetime.now)
     def __repr__(self):
         return f'<EntryExit {self.name} {self.action} {self.timestamp}>'
+
+
+class UserImage(Base):
+    __tablename__ = "Picture"
+    id = Column(Integer, primary_key=True)
+    img_data = Column(LargeBinary)
+    name =Column(String(50), nullable=False)
