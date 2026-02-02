@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Leaflet 画像上マーカー管理（新規追加・編集ダイアログ＋ツールバー設定）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    #map {
+      width: 100%;
+      height: calc(100% - 60px);
+    }
+
+    #toolbar {
+      height: 60px;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      border-bottom: 1px solid #ccc;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button.active {
+      background: #007bff;
+      color: white;
+    }
+
+    #editDialog {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      padding: 15px;
+      display: none;
+      z-index: 9999;
+    }
+
+    /* ホバー用ダイアログ（読み取り専用） */
+    #hoverDialog {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 4px;
+      display: none;
+      pointer-events: none;
+      /* マウスイベントを邪魔しない */
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    #editDialog label {
+      display: block;
+      margin: 6px 0;
+    }
+
+    #editDialog button {
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="toolbar">
+    <button id="addBtn">新規追加</button>
+    <button id="editBtn">編集モード</button>
+    <button id="deleteBtn">削除モード</button>
+    <button id="saveBtn">JSON保存</button>
+    <button id="loadBtn">JSON読込</button>
+    <label>色: <input type="color" id="toolbarColor" value="#ff0000"></label>
+    <label>サイズ:
+      <select id="toolbarSize">
+        <option value="xs">XS</option>
+        <option value="s">S</option>
+        <option value="m" selected>M</option>
+        <option value="l">L</option>
+        <option value="xl">XL</option>
+      </select>
+    </label>
+  </div>
+  <div id="map"></div>
+  <!-- 共通ダイアログ -->
+  <div id="editDialog">
+    <label>タイトル: <input type="text" id="editTitle"></label>
+    <label>色: <input type="color" id="editColor"></label>
+    <label>サイズ:
+      <select id="editSize">
+        <option value="xs">XS</option>
+        <option value="s">S</option>
+        <option value="m">M</option>
+        <option value="l">L</option>
+        <option value="xl">XL</option>
+      </select>
+    </label>
+    <button id="editApply">OK</button>
+    <button id="editCancel">キャンセル</button>
+  </div>
+  <div id="hoverDialog"></div>
+  <script>
+    // ---------------------------
+    // 1. Leaflet設定
+    // ---------------------------
+    const map = L.map('map', { crs: L.CRS.Simple, minZoom: -1, maxZoom: 4 });
+    const imageUrl = 'your_image.jpg'; // 任意の画像パスに変更
+    const imageWidth = 1000, imageHeight = 800;
+    const bounds = [[0, 0], [imageHeight, imageWidth]];
+    L.imageOverlay(imageUrl, bounds).addTo(map);
+    map.fitBounds(bounds);
+    // ---------------------------
+    // 2. 状態管理
+    // ---------------------------
+    let markers = [];
+    let currentMode = null; // add / edit / delete / null
+    let editingMarker = null;
+    let addingPosition = null;
+    const sizeLevels = { xs: 0.8, s: 1.0, m: 1.3, l: 1.6, xl: 2.0 };
+    // ツールバー設定
+    let currentColor = document.getElementById("toolbarColor").value;
+    let currentSize = document.getElementById("toolbarSize").value;
+    // ---------------------------
+    // 3. マーカー作成
+    // ---------------------------
+    function createMarkerIcon(title, color, sizeKey) {
+      const base = 30;
+      const size = base * sizeLevels[sizeKey];
+      const half = size / 2;
+      return L.divIcon({
+        html: `
+          <div style="
+            position: relative;
+            width: ${size}px;
+            height: ${size}px;
+            background: ${color}66;
+            border: 2px solid ${color};
+            border-radius: 4px;
+            box-sizing: border-box;
+          ">
+            <div style="
+              position: absolute;
+              bottom: ${size}px;
+              left: 50%;
+              transform: translateX(-50%);
+              font-size: ${Math.max(10, size * 0.4)}px;
+              background: rgba(255,255,255,0.8);
+              padding: 2px 4px;
+              border-radius: 3px;
+              white-space: nowrap;
+            ">${title}</div>
+          </div>`,
+        className: '',
+        iconSize: [size, size + 20],
+        iconAnchor: [half, half]
+      });
+    }
+    function addMarker(lat, lng, title = "新しいマーカー", color = currentColor, sizeKey = currentSize) {
+      const icon = createMarkerIcon(title, color, sizeKey);
+      const marker = L.marker([lat, lng], { icon, draggable: false })
+        .addTo(map)
+        .bindPopup(`<b>${title}</b><br>(${lat.toFixed(1)}, ${lng.toFixed(1)})`);
+      const m = { marker, title, lat, lng, color, sizeKey };
+      attachMarkerEvents(m);
+      markers.push(m);
+    }
+    // ---------------------------
+    // 4. モード切り替え
+    // ---------------------------
+    function setMode(mode) {
+      currentMode = (currentMode === mode) ? null : mode;
+      document.querySelectorAll('#toolbar button').forEach(btn => btn.classList.remove('active'));
+      if (currentMode) document.getElementById(mode + 'Btn').classList.add('active');
+      markers.forEach(m => {
+        if (currentMode === "edit") {
+          m.marker.dragging.enable();
+        } else {
+          m.marker.dragging.disable();
+        }
+      });
+    }
+    // ---------------------------
+    // 5. クリックイベント
+    // ---------------------------
+    map.on('click', e => {
+      if (currentMode === "add") {
+        addingPosition = e.latlng;
+        openEditDialog(null, currentColor, currentSize);
+      }
+    });
+    // ---------------------------
+    // 6. マーカーイベント
+    // ---------------------------
+    function attachMarkerEvents(m) {
+      m.marker.on('click', () => {
+        if (currentMode === "delete") {
+          if (confirm("このマーカーを削除しますか？")) {
+            map.removeLayer(m.marker);
+            markers = markers.filter(x => x !== m);
+          }
+        } else if (currentMode === "edit") {
+          openEditDialog(m, m.color, m.sizeKey);
+        }
+      });
+      m.marker.on('dragend', e => {
+        const { lat, lng } = e.target.getLatLng();
+        m.lat = lat;
+        m.lng = lng;
+      });
+    }
+    function updateMarkerStyle(m) {
+      const icon = createMarkerIcon(m.title, m.color, m.sizeKey);
+      m.marker.setIcon(icon);
+      m.marker.bindPopup(`<b>${m.title}</b><br>(${m.lat.toFixed(1)}, ${m.lng.toFixed(1)})`);
+    }
+    // ---------------------------
+    // 7. ダイアログ共通処理
+    // ---------------------------
+    const dialog = document.getElementById("editDialog");
+    const editTitle = document.getElementById("editTitle");
+    const editColor = document.getElementById("editColor");
+    const editSize = document.getElementById("editSize");
+    const editApply = document.getElementById("editApply");
+    const editCancel = document.getElementById("editCancel");
+    function openEditDialog(m, color, sizeKey) {
+      editingMarker = m;
+      editTitle.value = m ? m.title : "新しいマーカー";
+      editColor.value = color;
+      editSize.value = sizeKey;
+      dialog.style.display = "block";
+    }
+    editApply.addEventListener("click", () => {
+      const title = editTitle.value;
+      const color = editColor.value;
+      const sizeKey = editSize.value;
+      if (editingMarker) {
+        // 既存マーカーの更新
+        editingMarker.title = title;
+        editingMarker.color = color;
+        editingMarker.sizeKey = sizeKey;
+        updateMarkerStyle(editingMarker);
+      } else if (addingPosition) {
+        // 新規追加
+        addMarker(addingPosition.lat, addingPosition.lng, title, color, sizeKey);
+      }
+      dialog.style.display = "none";
+      editingMarker = null;
+      addingPosition = null;
+    });
+    editCancel.addEventListener("click", () => {
+      dialog.style.display = "none";
+      editingMarker = null;
+      addingPosition = null;
+    });
+
+
+    const hoverDialog = document.getElementById("hoverDialog");
+
+    // マウス位置に合わせてホバーダイアログを動かす
+    window.addEventListener('mousemove', (e) => {
+      if (hoverDialog.style.display === "block") {
+        hoverDialog.style.left = (e.clientX + 15) + "px";
+        hoverDialog.style.top = (e.clientY + 15) + "px";
+      }
+    });
+
+    function attachMarkerEvents(m) {
+      // クリックイベント
+      m.marker.on('click', (e) => {
+        // Leafletのイベント伝搬を止める（背後の地図クリック＝新規追加が発動しないようにする）
+        L.DomEvent.stopPropagation(e);
+
+        if (currentMode === "delete") {
+          if (confirm("このマーカーを削除しますか？")) {
+            map.removeLayer(m.marker);
+            markers = markers.filter(x => x !== m);
+            hoverDialog.style.display = "none";
+          }
+        } else {
+          // 「編集モード」だけでなく「新規追加モード」や「モードなし」でも
+          // 既存マーカーをクリックしたら編集ダイアログを出す
+          openEditDialog(m, m.color, m.sizeKey);
+        }
+      });
+
+      // マウスオーバー（ホバー）イベント：全モード共通
+      m.marker.on('mouseover', () => {
+        hoverDialog.innerHTML = `
+      <strong>${m.title}</strong><br>
+      サイズ: ${m.sizeKey.toUpperCase()}<br>
+      座標: (${m.lat.toFixed(1)}, ${m.lng.toFixed(1)})
+    `;
+        hoverDialog.style.display = "block";
+      });
+
+      // マウスアウト
+      m.marker.on('mouseout', () => {
+        hoverDialog.style.display = "none";
+      });
+
+      m.marker.on('dragend', e => {
+        const { lat, lng } = e.target.getLatLng();
+        m.lat = lat;
+        m.lng = lng;
+      });
+    }
+    // ---------------------------
+    // 8. JSON保存／読込
+    // ---------------------------
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const data = markers.map(m => ({
+        title: m.title,
+        lat: m.lat,
+        lng: m.lng,
+        color: m.color,
+        sizeKey: m.sizeKey
+      }));
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "markers.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    document.getElementById('loadBtn').addEventListener('click', () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "application/json";
+      input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+          const data = JSON.parse(reader.result);
+          markers.forEach(m => map.removeLayer(m.marker));
+          markers = [];
+          data.forEach(d => addMarker(d.lat, d.lng, d.title, d.color, d.sizeKey));
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    });
+    // ---------------------------
+    // 9. ツールバー設定変更
+    // ---------------------------
+    document.getElementById("toolbarColor").addEventListener("input", e => {
+      currentColor = e.target.value;
+    });
+    document.getElementById("toolbarSize").addEventListener("change", e => {
+      currentSize = e.target.value;
+    });
+    // ---------------------------
+    // 10. ボタンイベント
+    // ---------------------------
+    document.getElementById('addBtn').addEventListener('click', () => setMode('add'));
+    document.getElementById('editBtn').addEventListener('click', () => setMode('edit'));
+    document.getElementById('deleteBtn').addEventListener('click', () => setMode('delete'));
+  </script>
+</body>
+
+</html>
