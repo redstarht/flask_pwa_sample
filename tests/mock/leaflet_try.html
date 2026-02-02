@@ -81,11 +81,18 @@
 
   <script>
     // 1. 設定
+    // L.crs.simple = 経度緯度の座標でなく x ,y で表記
     const map = L.map('map', { crs: L.CRS.Simple, minZoom: -1, maxZoom: 4 });
     const imageUrl = './back.png'; 
     const imageWidth = 1000, imageHeight = 800;
     const bounds = [[0, 0], [imageHeight, imageWidth]];
+    
+    // マップの特定の境界上に単一の画像を読み込んで表示するために使用
+    // 画像の URL とそれが関連付けられている地理的境界を指定して
+    // 画像オーバーレイ オブジェクトをインスタンス化
     L.imageOverlay(imageUrl, bounds).addTo(map);
+    
+    // 可能な最大ズーム レベルで、指定された地理的境界を含むマップ ビューを設定します。
     map.fitBounds(bounds);
 
     let markers = [];
@@ -97,6 +104,7 @@
     const sizeLevels = { xs: 1.0, s: 1.5, m: 2.0, l: 2.5, xl: 3.0 };
     const BASE_SIZE = 15; 
 
+    // ツールバー設定
     let currentColor = document.getElementById("toolbarColor").value;
     let currentFontColor = document.getElementById("toolbarFontColor").value;
     let currentSize = document.getElementById("toolbarSize").value;
@@ -107,6 +115,7 @@
     // 2. アイコン作成 (ズームレベルに応じて計算)
     function createMarkerIcon(title, color, fontColor, sizeKey) {
       const zoom = map.getZoom();
+      console.log(zoom)
       // ズーム倍率を計算（Simple CRSの場合、2^zoom がスケールになる）
       const scale = Math.pow(2, zoom);
       
@@ -200,6 +209,7 @@
     function setMode(mode) {
       currentMode = (currentMode === mode) ? null : mode;
       document.querySelectorAll('#toolbar button').forEach(btn => btn.classList.remove('active'));
+      
       if (currentMode) document.getElementById(mode + 'Btn').classList.add('active');
       
       markers.forEach(m => {
