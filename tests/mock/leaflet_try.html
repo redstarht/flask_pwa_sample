@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="utf-8" />
   <title>Leaflet マーカー管理システム v4</title>
@@ -7,26 +8,118 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    html, body { height: 100%; margin: 0; overflow: hidden; font-family: sans-serif; }
-    #main-container { display: flex; height: calc(100% - 60px); width: 100%; }
-    #map { flex-grow: 1; height: 100%; background: #eee; }
-    
-    #sidebar { width: 250px; height: 100%; border-left: 1px solid #ccc; background: #fafafa; overflow-y: auto; padding: 10px; box-sizing: border-box; }
-    .marker-item { padding: 8px; border-bottom: 1px solid #ddd; cursor: pointer; font-size: 13px; }
-    .marker-item:hover { background: #e9ecef; }
-    .marker-item strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
 
-    #toolbar { height: 60px; background: #f0f0f0; display: flex; align-items: center; justify-content: flex-start; border-bottom: 1px solid #ccc; padding: 0 15px; gap: 12px; }
-    button { cursor: pointer; padding: 5px 10px; }
-    button.active { background: #007bff; color: white; border: 1px solid #0056b3; }
+    #main-container {
+      display: flex;
+      height: calc(100% - 60px);
+      width: 100%;
+    }
 
-    #editDialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid #ccc; box-shadow: 0 4px 12px rgba(0,0,0,0.3); padding: 20px; display: none; z-index: 9999; border-radius: 8px; min-width: 240px; }
-    #editDialog label { display: block; margin: 10px 0; font-size: 14px; }
-    #editDialog input[type="text"] { width: 100%; box-sizing: border-box; padding: 4px; }
+    #map {
+      flex-grow: 1;
+      height: 100%;
+      background: #eee;
+    }
 
-    #hoverDialog { position: fixed; background: rgba(0, 0, 0, 0.85); color: #fff; padding: 10px; border-radius: 6px; display: none; pointer-events: none; z-index: 10000; font-size: 12px; line-height: 1.5; }
+    #sidebar {
+      width: 250px;
+      height: 100%;
+      border-left: 1px solid #ccc;
+      background: #fafafa;
+      overflow-y: auto;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .marker-item {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .marker-item:hover {
+      background: #e9ecef;
+    }
+
+    .marker-item strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #toolbar {
+      height: 60px;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      border-bottom: 1px solid #ccc;
+      padding: 0 15px;
+      gap: 12px;
+    }
+
+    button {
+      cursor: pointer;
+      padding: 5px 10px;
+    }
+
+    button.active {
+      background: #007bff;
+      color: white;
+      border: 1px solid #0056b3;
+    }
+
+    #editDialog {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      display: none;
+      z-index: 9999;
+      border-radius: 8px;
+      min-width: 240px;
+    }
+
+    #editDialog label {
+      display: block;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    #editDialog input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 4px;
+    }
+
+    #hoverDialog {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      display: none;
+      pointer-events: none;
+      z-index: 10000;
+      font-size: 12px;
+      line-height: 1.5;
+    }
   </style>
 </head>
+
 <body>
 
   <div id="toolbar">
@@ -73,25 +166,27 @@
     </label>
     <div style="text-align: right; margin-top: 15px;">
       <button id="editCancel">キャンセル</button>
-      <button id="editApply" style="background:#007bff; color:white; border:none; padding:5px 15px; border-radius:4px;">OK</button>
+      <button id="editApply"
+        style="background:#007bff; color:white; border:none; padding:5px 15px; border-radius:4px;">OK</button>
     </div>
   </div>
 
   <div id="hoverDialog"></div>
 
   <script>
-    // 1. 設定
+    // 1. 設定　済
     // L.crs.simple = 経度緯度の座標でなく x ,y で表記
     const map = L.map('map', { crs: L.CRS.Simple, minZoom: -1, maxZoom: 4 });
-    const imageUrl = './back.png'; 
+    const imageUrl = './back.png';
     const imageWidth = 1000, imageHeight = 800;
     const bounds = [[0, 0], [imageHeight, imageWidth]];
-    
+    let index = 0;
+
     // マップの特定の境界上に単一の画像を読み込んで表示するために使用
     // 画像の URL とそれが関連付けられている地理的境界を指定して
     // 画像オーバーレイ オブジェクトをインスタンス化
     L.imageOverlay(imageUrl, bounds).addTo(map);
-    
+
     // 可能な最大ズーム レベルで、指定された地理的境界を含むマップ ビューを設定します。
     map.fitBounds(bounds);
 
@@ -100,11 +195,11 @@
     let editingMarker = null;
     let addingPosition = null;
 
-    // サイズ感の調整（全体的に小さく。M=15px程度を基準に）
+    // サイズ感の調整（全体的に小さく。M=15px程度を基準に）　済
     const sizeLevels = { xs: 1.0, s: 1.5, m: 2.0, l: 2.5, xl: 3.0 };
-    const BASE_SIZE = 15; 
+    const BASE_SIZE = 15;
 
-    // ツールバー設定
+    // ツールバー設定　済
     let currentColor = document.getElementById("toolbarColor").value;
     let currentFontColor = document.getElementById("toolbarFontColor").value;
     let currentSize = document.getElementById("toolbarSize").value;
@@ -112,16 +207,39 @@
     const hoverDialog = document.getElementById("hoverDialog");
     const markerListEl = document.getElementById("markerList");
 
-    // 2. アイコン作成 (ズームレベルに応じて計算)
+    /**
+     * 数値を Excel スタイルのアルファベット形式に変換する
+     * @param {number} index - 0から始まるインデックス (0 => A, 25 => Z, 26 => AA)
+     * @returns {string}
+    */
+    function getNextName(index) {
+      let name = "";
+      let i = index;
+
+      while (i >= 0) {
+        // 26で割った余りから文字を特定 (0=A, 1=B, ..., 25=Z)
+        name = String.fromCharCode((i % 26) + 65) + name;
+
+        // 次の桁の計算（Aから始まるため、1を引いて調整するのがコツ）
+        i = Math.floor(i / 26) - 1;
+      }
+
+      return name;
+    }
+
+
+    // 2. アイコン作成 (ズームレベルに応じて計算)　済
     function createMarkerIcon(title, color, fontColor, sizeKey) {
       const zoom = map.getZoom();
       console.log(zoom)
       // ズーム倍率を計算（Simple CRSの場合、2^zoom がスケールになる）
       const scale = Math.pow(2, zoom);
-      
+
+
+      // BASE_SIZE = 15 とし Midiumの場合は 30pxとなる
       const size = BASE_SIZE * sizeLevels[sizeKey] * scale;
       const fontSize = Math.max(8, size * 0.4);
-      
+
       return L.divIcon({
         html: `
           <div style="display:flex; align-items:center; justify-content:center; width:${size}px; height:${size}px; background:${color}66; border:1px solid ${color}; border-radius:3px; box-sizing:border-box; position:relative;">
@@ -140,14 +258,19 @@
       });
     }
 
-    // ズーム終了時にサイズを再計算
+    // ズーム終了時にサイズを再計算　済
     map.on('zoomend', refreshAllMarkers);
 
     // 3. マーカー操作
+    /*
+    JSON読み込み時も使用
+    ・renderListで右枠のリストも更新
+    */
     function addMarker(lat, lng, title, color, fontColor, sizeKey) {
       const icon = createMarkerIcon(title, color, fontColor, sizeKey);
+      // currentMode が 'add' か 'edit' のときに true、それ以外のときに false　でドラッグ可能かが決まる
       const marker = L.marker([lat, lng], { icon, draggable: (currentMode === 'add' || currentMode === 'edit') }).addTo(map);
-      
+
       const m = { id: Date.now(), marker, title, lat, lng, color, fontColor, sizeKey };
       attachMarkerEvents(m);
       markers.push(m);
@@ -155,12 +278,15 @@
       return m;
     }
 
+
+    // 右枠へのマーカー一覧処理 済
     function renderList() {
       markerListEl.innerHTML = "";
       markers.forEach(m => {
         const item = document.createElement("div");
         item.className = "marker-item";
         item.innerHTML = `<strong>${m.title}</strong><span style="font-size:11px; color:gray;">(${m.lat.toFixed(0)}, ${m.lng.toFixed(0)})</span>`;
+        // アイテムクリック時のフォーカス合わせ
         item.onclick = () => {
           map.panTo(m.marker.getLatLng());
         };
@@ -168,8 +294,12 @@
       });
     }
 
+
+    // マーカクリック時の処理 ( mode削除時、popup処理 / それ以外の場合はダイアログ)
+    // ホバー時処理、ドラッグ時の処理
     function attachMarkerEvents(m) {
       m.marker.on('click', (e) => {
+        // stopPropagationで イベント伝搬阻止 
         L.DomEvent.stopPropagation(e);
         if (currentMode === "delete") {
           if (confirm("このマーカーを削除しますか？")) {
@@ -189,7 +319,7 @@
       });
 
       m.marker.on('mouseout', () => hoverDialog.style.display = "none");
-      
+
       m.marker.on('dragend', e => {
         const { lat, lng } = e.target.getLatLng();
         m.lat = lat; m.lng = lng;
@@ -197,7 +327,7 @@
       });
     }
 
-    // マウス位置
+    // マウス位置　済
     window.addEventListener('mousemove', (e) => {
       if (hoverDialog.style.display === "block") {
         hoverDialog.style.left = (e.clientX + 15) + "px";
@@ -205,13 +335,13 @@
       }
     });
 
-    // 4. モード・ダイアログ
+    // 4. モード・ダイアログ　済
     function setMode(mode) {
       currentMode = (currentMode === mode) ? null : mode;
       document.querySelectorAll('#toolbar button').forEach(btn => btn.classList.remove('active'));
-      
+
       if (currentMode) document.getElementById(mode + 'Btn').classList.add('active');
-      
+
       markers.forEach(m => {
         (currentMode === "edit" || currentMode === "add") ? m.marker.dragging.enable() : m.marker.dragging.disable();
       });
@@ -231,15 +361,51 @@
     const editSize = document.getElementById("editSize");
 
     function openEditDialog(m, color, fontColor, sizeKey) {
+      /*
+      Args{
+      m :　null = 新規マーカー作成 , m(object) = マーカー編集
+      }
+
+      Note : 
+        ダイアログの表示を担う
+
+      
+      */
       editingMarker = m;
       document.getElementById("dialogTitle").innerText = m ? "マーカーの編集" : "新規マーカー作成";
-      editTitle.value = m ? m.title : "New Marker";
+      
+      // 本番はSort_orderで右枠の順番は実装し、A~Z AA は手書きかな？
+      editTitle.value = m ? m.title : getNextName(index);
+      index = index+1 ;
+      
       editColor.value = color;
       editFontColor.value = fontColor;
       editSize.value = sizeKey;
       dialog.style.display = "block";
     }
 
+
+    /**
+ * 数値を Excel スタイルのアルファベット形式に変換する
+ * @param {number} index - 0から始まるインデックス (0 => A, 25 => Z, 26 => AA)
+ * @returns {string}
+ */
+    function getNextName(index) {
+      let name = "";
+      let i = index;
+
+      while (i >= 0) {
+        // 26で割った余りから文字を特定 (0=A, 1=B, ..., 25=Z)
+        name = String.fromCharCode((i % 26) + 65) + name;
+
+        // 次の桁の計算（Aから始まるため、1を引いて調整するのがコツ）
+        i = Math.floor(i / 26) - 1;
+      }
+
+      return name;
+    }
+
+    // ダイアログ編集反映処理
     document.getElementById("editApply").onclick = () => {
       if (editingMarker) {
         editingMarker.title = editTitle.value;
@@ -254,10 +420,16 @@
       closeDialog();
     };
 
-    document.getElementById("editCancel").onclick = closeDialog;
-    function closeDialog() { dialog.style.display = "none"; editingMarker = null; addingPosition = null; }
 
-    // JSON 保存・読込
+    // ダイアログDOM操作
+    document.getElementById("editCancel").onclick = closeDialog;
+
+    // ダイアログを閉じる
+    function closeDialog() {
+      dialog.style.display = "none"; editingMarker = null; addingPosition = null;
+    }
+
+    // JSON保存
     document.getElementById('saveBtn').onclick = () => {
       const data = markers.map(m => ({ title: m.title, lat: m.lat, lng: m.lng, color: m.color, fontColor: m.fontColor, sizeKey: m.sizeKey }));
       const a = document.createElement("a");
@@ -266,6 +438,7 @@
       a.click();
     };
 
+    // JSON読み込み
     document.getElementById('loadBtn').onclick = () => {
       const input = document.createElement("input");
       input.type = "file";
@@ -290,4 +463,5 @@
     document.getElementById('deleteBtn').onclick = () => setMode('delete');
   </script>
 </body>
+
 </html>
